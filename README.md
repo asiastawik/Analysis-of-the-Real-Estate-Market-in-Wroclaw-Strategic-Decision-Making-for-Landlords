@@ -1,0 +1,1 @@
+# Analysis-of-the-Real-Estate-Market-in-Wroclaw-Strategic-Decision-Making-for-Landlords
