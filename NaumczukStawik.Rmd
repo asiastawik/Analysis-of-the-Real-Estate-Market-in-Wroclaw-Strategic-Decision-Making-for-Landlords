@@ -1,0 +1,583 @@
+---
+title: "Analysis of the Real Estate Market in Wroclaw: Stategic Decision-Making for Landlords"
+author: "Joanna Stawik, Adriana Naumczuk"
+date: "`r format(Sys.time(), '%m/%d/%Y %X')`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+    number_sections: true
+    self_contained: true
+---
+ 
+```{r setup, include=FALSE}
+## Global options
+library(knitr)
+knitr::opts_chunk$set(
+	echo = TRUE,
+	fig.align = "center",
+	fig.height = 4.7,
+	fig.width = 7.4,
+	message = FALSE,
+	warning = FALSE,
+	cache = FALSE,
+	comment = NA,
+	prompt = FALSE,
+	tidy = TRUE
+)
+opts_knit$set(width = 80)
+```
+ 
+```{r Downloading data and packages}
+library(tidyverse)
+library(ggplot2)
+library(leaflet)
+library(RColorBrewer)
+library(dplyr)
+ 
+data <- read_csv("data/Oto_Dom_cleaned.csv")
+```
+ 
+# Introduction
+
+In the dynamic realm of real estate, strategic decision-making is paramount for landlords seeking to navigate the ever-evolving market landscape. This report serves as a comprehensive analysis of the real estate market in Wroclaw, drawing insights from a meticulously conducted project utilizing R and web scraping techniques on the OtoDom.pl website.
+ 
+As the fourth-largest city in Poland, Wroclaw's property market is a tapestry of opportunities and challenges. Through this analysis, we aim to provide landlords with valuable insights, enabling them to make informed decisions that align with the city's current real estate trends. This report offers a strategic lens for landlords keen on maximizing their investments in the vibrant Wroclaw market.
+ 
+ 
+# Wroclaw Real Estate Market Overview
+ 
+Wroclaw's real estate market reflects a city that has experienced steady economic growth, contributing to a positive environment for property investment. Diverse economic sectors, including IT, manufacturing, and services, play pivotal roles in shaping the city's real estate landscape. The population of Wroclaw has been on the rise, fueled by both domestic migration and an influx of residents from other European Union countries. This population growth is a key factor influencing the demand for housing.
+ 
+Urban development projects have been transforming Wroclaw, enhancing its overall appeal. The city has witnessed infrastructure improvements and modernization efforts, impacting property values and demand. In the residential real estate sector, a variety of housing options, from apartment complexes to detached houses, cater to the diverse needs of the population. The commercial real estate market in Wroclaw is also burgeoning, with the development of office spaces and retail establishments.
+ 
+The rental market is significant, accommodating both locals and expatriates. Proximity to business centers, universities, and transportation hubs tends to drive higher demand for rental properties. Wroclaw presents opportunities for real estate investors, particularly in areas undergoing revitalization or earmarked for future development. The city's economic stability and growth potential contribute to its attractiveness as an investment destination.
+ 
+ 
+# Data Collection and Methodology
+ 
+We utilized the R programming language along with web scraping techniques to collect real estate data from the OtoDom.pl website for properties available for rent in Wroclaw. The process involved the following steps:
+ 
+## Web Scrapping Pages
+ 
+We scraped links to adverts from multiple pages (as for the day of writing this article there are 66 pages, on each page we have 30 normal adds and 3 highlighted adds) on the *OtoDom.pl* website using the `rvest`, `httr`, `stringi` and `tidyverse` packages in R. First, the code iterated through each page, making HTTP requests, and extracting property URLs. We did not forget about sending request using `GET` method, with properly adressed `user_agent`, checking the status code and at the same time trying to catch any possible error while requesting with `tryCatch()` method. We are sending request every two seconds. At the end we are checking for unique URLs to exclude any possible duplicates. Full code is in `scrapper_website.R` file.
+ 
+## Accessing Property Details
+ 
+After saving full URLs for every advert we extracted relevant details such as address, description, price, area, and additional information using web scraping techniques. The data was then stored in separate lists. The collected data was combined into a comprehensive data frame named `df`, containing information on each property. At the end we were having data from 2368 adverts and 26 columns denoting a given piece of information about the flat. We used here packages `httr`, `rvest`, `purrr`, `glue` and `readr`. Full code is in `scrapper_links.R` file.
+ 
+## Data Cleaning Process
+ 
+The collected data underwent a cleaning process to enhance its reliability and usability. Key steps involved:
+ 
+1. Dividing:
+- Address into street, neighbourhood, district, city, voivodeship;
+- Floor into current and maximum.
+ 
+2. Splitting value numbers and units:
+- Price into value and currency;
+- Area into value and unit;
+- Rent into value and unit/period;
+- Deposit into value and unit.
+ 
+3. Changing description features into binary columns:
+- Outside into balcony, terrace, garden;
+- Equipment into dishwasher, refrigerator, furniture, oven, stove, washing_machine, TV;
+- Security into closed area, intercom or videophone, monitoring security, anti-burglary doors or windows, anti-burglary rollers, alarm system;
+- Parking;
+- Additional information into air conditioning, kitchen, basement, nonsmoking, utility room, two-story flat;
+- Lift;
+- Media into cable TV, internet, telephone.
+ 
+4. Clearing building year:
+- Check if year has 4 digits;
+- Check if year is not bigger than current year (2024);
+- Create ranges for every 10 years.
+ 
+5. Changing currency into polish złoty (zł).
+ 
+After cleaning we have data from 2368 adverts and 55 columns. This methodology ensures that the collected data is reliable, structured, and ready for further analysis in the context of the real estate market in Wroclaw.
+ 
+# Rental Market Analysis
+ 
+We're digging into details like how much properties are rented for, what landlords are earning, and the unique qualities of each neighborhood. By examining ads, types of buildings, materials used, heating systems, and window styles, we're giving landlords a clear picture of what shapes property values and what tenants prefer.
+ 
+We want to not only show the current state of the rental market but also help landlords lay the groundwork for making savvy choices. The real estate market changes with the economy and society, and this analysis is here to make sure landlords have the know-how to adjust, succeed, and get the most out of their investments.
+ 
+```{r 1}
+ 
+# Histogram for Rent_Value
+ggplot(data, aes(x = Rent_Value)) +
+  geom_histogram(bins = 30, fill = "blue", color = "black") +
+  labs(title = "Histogram Rent Price",
+       x = "Rent Price (PLN)",
+       y = "Frequency") +
+  theme_minimal()+
+scale_x_continuous(breaks = seq(0, 5000, by = 250))
+```
+ 
+The histogram reveals a notable increase in property demand for rentals priced from 0 to 750 zł, indicating a potential sweet spot for attracting tenants. However, beyond 750 zł to 2000 zł, there's a decline in frequency, suggesting a decrease in demand as prices rise. Landlords aiming for higher rent brackets should be aware of the less common occurrence of prices above 2000 zł. 
+ 
+```{r 2}
+# Histogram for Price_Value
+ggplot(data, aes(x = Price_Value)) +
+  geom_histogram(bins = 30, fill = "blue", color = "black") +
+  labs(title = "Histogram Landlord Income",
+       x = "Landlord Income (PLN)",
+       y = "Frequency") +
+  theme_minimal()+
+scale_x_continuous(breaks = seq(0, 25000, by = 1500))
+```
+
+The second graph suggests a significant presence of landlords with more modest incomes. Those targeting this market segment may find opportunities for competitive pricing. Conversely, landlords aiming for higher-end properties should note the limited frequency of incomes exceeding 10000 zł, signaling less competition in this segment. 
+ 
+```{r 3}
+# Histogram for Deposit_Value
+ggplot(data, aes(x = Deposit_Value)) +
+  geom_histogram(bins = 30, fill = "blue", color = "black") +
+  labs(title = "Histogram Deposit Price",
+       x = "Deposit Price (PLN)",
+       y = "Frequency") +
+  theme_minimal()+
+scale_x_continuous(breaks = seq(0, 30000, by =2500))
+ 
+```
+ 
+The next histogram suggests a substantial presence of properties with lower deposit requirements. Adjusting deposit policies to align with this market norm can enhance accessibility for a broader tenant base. Additionally, the scarcity of higher deposit values above 10000 zł signals potential market opportunities with less competition in premium property segments. 
+
+```{r 4}
+average_district_price <-  data %>%
+  group_by(District) %>%
+  summarise(average_price = mean(Price_Value, na.rm = TRUE))
+ 
+ggplot(average_district_price, aes(x = reorder(District, average_price), y = average_price)) +
+  geom_bar(stat = "identity", fill = "blue", color = "black") +
+  labs(title = "Average District Prices",
+       x = "District",
+       y = "Average Rent Price (PLN)") +
+  theme_minimal()
+ 
+```
+
+The final histogram reveals a ascending order of average rent prices across Wroclaw districts, with Fabryczna being the most budget-friendly and Siechnice commanding the highest averages. 
+ 
+```{r 5}
+advert_type <- data %>%
+  group_by(Advertiser_Type) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count))
+ 
+total <- sum(advert_type$count)
+ 
+ggplot(advert_type, aes(x = "", y = count, fill = Advertiser_Type)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar(theta = "y") +
+  geom_text(aes(label = paste0(round((count / total) * 100, 1), "%")), position = position_stack(vjust = 0.2)) +
+   labs(title = "Pie Chart of Advertiser Types", fill = "Advertiser Type") +
+  theme_minimal()
+ 
+```
+
+In the first pie chart detailing advertiser types, estate agencies (biuro nieruchomości) emerge as the predominant advertisers, constituting a substantial 68.5% of the total. Private advertisements (prywatny) follow with a share of 30.7%, while developers (deweloper) lag behind with a modest 0.8% of the total instances.
+ 
+ 
+```{r 6}
+heating <- data %>%
+  group_by(Heating) %>%
+  summarise(count = n())
+ 
+total4 <- sum(heating$count)
+ 
+ggplot(heating, aes(x = "", y = count, fill = Heating)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar(theta = "y") +
+  geom_text(aes(label = paste0(round((count / total4) * 100, 1), "%")), position = position_stack(vjust = 0.2)) +
+  labs(title = "Pie Chart of Heating Types", fill = "Heating Type") +
+  theme_minimal()
+```
+
+For the next pie chart detailing heating types, the predominant category is Municipal (miejskie), comprising a substantial 69.8% of the total. Notably, the absence of information about heating types constitutes 18.5% of the distribution. Gas heating (gazowe) follows as the second most prevalent category, representing 6.9% of the data. Boiler room heating (kotłownia) and electric heating (elektryczne) contribute 1.7% and 1.5%, respectively. Another unspecified heating type accounts for 1.4%.
+ 
+This pie chart provides insightful information for property stakeholders, showcasing the prevailing heating preferences in the market. This data can be invaluable for potential buyers or tenants seeking properties with specific heating preferences or requirements.
+
+```{r 7}
+windows_type <- data %>%
+  group_by(Windows_Type) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count))
+ 
+total5 <- sum(windows_type$count)
+ 
+ggplot(windows_type, aes(x = "", y = count, fill = Windows_Type)) +
+  geom_bar(stat = "identity", width = 1) +
+  geom_text(aes(label = paste0(round((count / total5) * 100, 1), "%")), position = position_stack(vjust = 0.5)) +
+  coord_polar(theta = "y") +
+  labs(title = "Pie Chart of Windows Types", fill = "Windows Type") +
+  theme_minimal()
+ 
+```
+ 
+In the window type pie chart, the prevalent category is Plastic (plastikowe), constituting a majority share of 53.5% in the total distribution. Conversely, a significant portion, 39.1%, lacks information about the specific window types used. Wooden (drewniane) windows represent 6.2% of the data, while aluminum (aluminiowe) windows contribute 1.2%.
+ 
+# Property Pricing Dynamics
+
+ 
+This chapter delves into the multifaceted landscape of property pricing dynamics, employing insightful visualizations to unravel the relationships between key factors and rental prices to find a deeper understanding of the intricate interplay between property characteristics and rental values, facilitating more informed decision-making within the dynamic real estate market. 
+
+## Standard features
+ 
+```{r}
+ 
+property_data <- data.frame(price = data$Price_Value, area = data$Area_Value, rooms = data$No_Rooms) %>%
+  filter(area <= 3000, rooms!="None")
+ 
+ggplot(property_data, aes(x = area, y = price)) +
+  geom_point(aes(shape = factor(rooms)), size = 3, color = "blue") +
+  geom_smooth(method = "lm", se = FALSE, color = "red") + 
+  labs(
+    title = "Scatter Plot of Rent Prices vs. Area",
+    x = "Area (m2)",
+    y = "Rent Price (PLN)"
+  ) +
+  scale_shape_manual(values = c(0, 1, 4, 2)) +
+  guides(shape = guide_legend(title = "Number of Rooms"))
+```
+
+The scatter plot in our analysis reveals a compelling dependence between the rental price and the area of the flat. As expected, a discernible trend emerges, indicating that larger flats command higher rental prices. This correlation underscores the inherent value placed on spacious living areas within the real estate market.
+ 
+Intriguingly, the use of distinct shapes for different room configurations enhances the clarity of our observations. Notably, square shapes are employed for 2-room flats, circles for 3-room flats, 'x' marks for 4-room flats, and triangles for 5-room flats. Examining the right side of the plot, we observe a prevalence of 'x' marks and triangles, logically aligning with the expectation that larger flats tend to have more rooms. Conversely, on the left side of the scatter plot, where the area of flats ranges from 30 to 70 square meters, a greater dispersion of points is evident. This distribution predominantly comprises square and circular shapes, signifying a higher frequency of 2 and 3-roomed flats within this size range.
+ 
+```{r}
+no_floors <- data.frame(price = data$Price_Value, floors = as.character(data$Floor_actual))
+no_floors <- no_floors %>%
+  filter(!is.na(floors))
+ 
+floor_order <- c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10")
+no_floors$floors <- factor(no_floors$floors, levels = floor_order)
+ 
+ggplot(no_floors, aes(x = floors, y = price)) +
+  geom_boxplot(size = 0.5) +
+  labs(
+    title = "Boxplot of Rent Prices vs. No. of floors",
+    x = "No. of floors",
+    y = "Rent Price (PLN)"
+  )
+```
+
+The boxplots depicting rent prices in relation to the number of floors in the building offer compelling insights into the distribution and variation of rental values across different building heights. Notably, a concentration of flats is observed on floors ranging from 1 to 5, as indicated by the broader spread of boxes in this range. As we progress to floors 6 and 7, a notable shift occurs, characterized by a larger interquartile range, denoted by the bigger box. This expansion implies that the third quartile (the upper boundary of the box) is higher for flats on these floors, suggesting a significant uptick in rental prices on the higher floors compared to the lower ones.
+ 
+In contrast, floors 8, 9, and 10 exhibit a distinct pattern. Here, the boxplots reveal a decrease in the count of flats, indicating a lower availability of properties on these higher floors. Concurrently, the average rental prices exhibit a descending trend, portraying a reduction in the central tendency of rental values. This inverse relationship between floor height and average rental price on floors 8-10 stands in contrast to the ascending average observed on floors 1-7.
+
+```{r}
+build_year <- data.frame(price = data$Price_Value, year = data$Build_Year_Range)
+build_year <- build_year %>%
+  filter(!is.na(year))
+ 
+ggplot(build_year, aes(x = year, y = price)) +
+  geom_boxplot(size = 0.5) +
+  labs(
+    title = "Scatter Plot of Rent Prices vs. built year range",
+    x = "Build Year",
+    y = "Rent Price (PLN)"
+  ) +
+  coord_flip()
+ 
+```
+
+The boxplots illustrating rent prices relative to the built year ranges provide a comprehensive perspective on the temporal dynamics within the real estate market. Notably, a pronounced observation is the prevalence of higher rental prices in the more recent year ranges, specifically between 2009 and 2024 (actual year). This trend is evidenced by the numerous outlier points that stand out in these periods, suggesting an increased occurrence of premium rental values during this timeframe.
+ 
+Contrastingly, the inverse relationship between the average rental price and the built year becomes evident. As the built year of the flat decreases, reflecting older properties, the average rental price tends to decrease as well. This aligns with the general expectation that newer constructions often command higher rents due to modern amenities and improved infrastructure.
+ 
+However, the unexpected rise in average prices for flats constructed between 1899 and 1890 introduces an intriguing anomaly. This counterintuitive increase may be indicative of unique historical or architectural features associated with these older properties, contributing to their perceived value and subsequent rental prices. 
+ 
+## Additional features
+
+Below we will analyse three graphs:
+ 
+1. **Average Price vs Presence of Utilities (Balcony, Garden, Terrace):**
+   - The examination of average rental prices concerning the presence of utilities reveals how certain amenities contribute to property values.
+   - Balconies, gardens, and terraces often enhance the living experience, and their presence is likely associated with higher average rental prices.
+ 
+2. **Average Price vs Presence of Equipment (Dishwasher, Furniture, Oven, Refrigerator, Stove, TV, Washing Machine):**
+   - This analysis explores the impact of various equipment on rental prices.
+   - Properties equipped with amenities such as a dishwasher, furniture, oven, refrigerator, stove, TV, and washing machine may command higher average rental prices due to increased convenience and functionality.
+ 
+3. **Average Price vs Presence of Additional Features (Air Conditioning, Basement, Cable TV, Garage/Parking, Internet, Lift, Separate Kitchen):**
+   - The presence of additional features often adds distinct value to a property, influencing its rental price.
+   - Features such as air conditioning, basement, cable TV, garage/parking, internet, lift, and a separate kitchen may contribute to higher average rental prices, reflecting increased comfort and desirability.
+ 
+Each analysis provides a nuanced understanding of how specific attributes and amenities influence the rental market. These insights can prove invaluable for both tenants seeking properties tailored to their preferences and landlords aiming to strategically position their offerings in the competitive real estate landscape. The correlation between these features and average rental prices offers a comprehensive overview of the diverse factors that contribute to the valuation of residential properties.
+
+```{r}
+utility_columns <- c("Balcony", "Terrace", "Garden")
+ 
+data %>%
+  gather(key = "Utility", value = "Presence", all_of(utility_columns)) %>%
+  group_by(Utility, Presence) %>%
+  summarise(Avg_Price = mean(Price_Value), 
+            SD_Price = sd(Price_Value),
+            Count = n()) %>%
+  ggplot(aes(x = Utility, y = Avg_Price, fill = as.factor(Presence))) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(ymin = Avg_Price - SD_Price, ymax = Avg_Price + SD_Price), position = "dodge", width = 0.25) +
+  labs(
+    title = "Average Price vs. Presence of Utilities",
+    x = "Utilities",
+    y = "Average Rent Price (PLN)"
+  ) +
+  scale_fill_manual(values = c("0" = "lightblue", "1" = "darkblue")) +
+  theme_minimal()
+ 
+ 
+equipment_columns <- c("Dishwasher", "Refrigerator",  "Furniture" , "Oven" ,"Stove" , "Washing_machine"  , "Tv")
+ 
+data %>%
+  gather(key = "Equipment", value = "Presence", all_of(equipment_columns)) %>%
+  group_by(Equipment, Presence) %>%
+  summarise(Avg_Price = mean(Price_Value), 
+            SD_Price = sd(Price_Value),
+            Count = n()) %>%
+  ggplot(aes(x = Equipment, y = Avg_Price, fill = as.factor(Presence))) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(ymin = Avg_Price - SD_Price, ymax = Avg_Price + SD_Price), position = "dodge", width = 0.25) +
+  labs(
+    title = "Average Price vs. Presence of Equipment",
+    x = "Equipment presence",
+    y = "Average Rent Price (PLN)"
+  ) +
+  scale_fill_manual(values = c("0" = "lightblue", "1" = "darkblue")) +
+  theme_minimal()
+ 
+ 
+additional_columns <- c("Cable_TV", "Internet" , "Air_conditioning", "Separate_kitchen",
+"Lift", "Garage_Parking" ,  "Basement")
+ 
+data %>%
+  gather(key = "Additional", value = "Presence", all_of(additional_columns)) %>%
+  group_by(Additional, Presence) %>%
+  summarise(Avg_Price = mean(Price_Value), 
+            SD_Price = sd(Price_Value),
+            Count = n()) %>%
+  ggplot(aes(x = Additional, y = Avg_Price, fill = as.factor(Presence))) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(ymin = Avg_Price - SD_Price, ymax = Avg_Price + SD_Price), position = "dodge", width = 0.25) +
+  labs(
+    title = "Average Price vs. Presence of Additional features",
+    x = "Additional features presence",
+    y = "Average Rent Price (PLN)"
+  ) +
+  scale_fill_manual(values = c("0" = "lightblue", "1" = "darkblue")) +
+  theme_minimal()
+ 
+```
+
+The first graph underscores the significance of outdoor spaces. A flat with a balcony commands a slightly higher average rental price, while those with a garden experience a noticeable increase. Remarkably, properties featuring a terrace exhibit a substantially higher average rent. Landlords should consider leveraging these outdoor amenities to attract tenants willing to pay a premium for enhanced living spaces.
+ 
+In the second analysis, having a dishwasher and TV appears to offer a modest advantage in rental pricing. However, the absence of discernible trends for furniture, oven, refrigerator, stove, and washing machine may be attributed to data collection nuances. It is conceivable that some advertisers opt for a narrative approach in their descriptions, rendering exhaustive checkboxes unnecessary. Landlords are encouraged to highlight these amenities explicitly in property descriptions to maximize their impact on perceived value.
+ 
+The third graph unveils the potential impact of additional features on rental prices. Properties equipped with air conditioning command a significantly higher average rent, while those with cable TV, garage/parking, internet, and a lift experience a modest uptick. Interestingly, having a basement has a neutral effect, and the presence of a separate kitchen does not consistently outperform kitchenettes. Landlords should carefully weigh the cost-benefit of these features, considering tenant preferences in their target market.
+ 
+In essence, these insights offer landlords strategic cues for pricing their flats based on distinct amenities and features. By aligning rental prices with tenant preferences and market trends, landlords can optimize their property's perceived value, making it a more attractive and competitive option in the dynamic real estate landscape.
+ 
+```{r}
+non_smokers <- data %>%
+  mutate(Only_nonsmokers_label = ifelse(Only_nonsmokers, "Yes", "No")) %>%
+  group_by(Only_nonsmokers_label) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count))
+
+ 
+total6 <- sum(non_smokers$count)
+ 
+ggplot(non_smokers, aes(x = "", y = count, fill = Only_nonsmokers_label)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar(theta = "y") +
+    geom_text(aes(label = paste0(round((count / total6) * 100, 1), "%")), position = position_stack(vjust = 0.5)) +
+  coord_polar(theta = "y") +
+  labs(title = "Pie Chart of Nonsmokers flat", fill = "Only nonsmokers") +
+  theme_minimal()
+```
+
+The pie chart depicting preferences regarding smoking in rental ads sheds light on a notable trend within the real estate market. Approximately 19.1% of advertisements explicitly express a preference not to rent to individuals who smoke. This insight underscores a growing consideration among landlords and property managers regarding the impact of smoking habits on the desirability of their rental units.
+ 
+Non-smoking preferences may reflect a broader emphasis on maintaining a smoke-free environment within rental properties. As such, tenants who do not smoke may find a higher number of options aligned with their lifestyle preferences, while landlords can strategically position their properties to cater to this demographic.
+ 
+This trend also highlights the increasing importance of lifestyle factors in shaping the dynamics of the rental market. By being attuned to these preferences, landlords can enhance their property marketing strategies, better aligning their offerings with the expectations and priorities of potential tenants.
+ 
+# Key Neighborhood Profiles
+ 
+In the analysis of key neighborhood profiles, we utilized various visualizations to gain insights into growth potential, amenities, and security features and average price across different neighborhoods in Wroclaw.
+ 
+## Neighborhood Growth Potential
+ 
+We employed a bubble map to highlight neighborhoods with growth potential based on average property prices. The size of each bubble represents the average price in the respective neighborhood, while the color gradient indicates the level of growth potential. This visualization allows for a quick and intuitive identification of areas that might be attractive for investment or show signs of future development.
+ 
+```{r}
+lat_lon_neighbourhood<- read_csv("data/Neighbourhood.csv", col_names = c("Neighbourhood", "Latitude", "Longitude"))
+ 
+average_prices <- data %>%
+  group_by(Neighbourhood) %>%
+  summarize(Avg_Price = mean(Price_Value, na.rm = TRUE))
+ 
+map_data <- lat_lon_neighbourhood %>%
+  left_join(average_prices, by = "Neighbourhood") %>%
+  mutate(SizeVariable = ifelse(is.na(Avg_Price), 0, Avg_Price))
+ 
+color_palette <- colorNumeric(palette = "RdYlGn", reverse = TRUE ,domain = map_data$Avg_Price)
+ 
+my_map <- leaflet(map_data) %>%
+  addProviderTiles("CartoDB.Positron") %>%
+  addCircles(
+    lat = ~Latitude,
+    lng = ~Longitude,
+    radius = ~SizeVariable/5 ,
+    color = ~color_palette(Avg_Price),
+    fillOpacity = 0.5,
+    popup = ~paste("Neighbourhood:", Neighbourhood, "<br>", "Average Rent Price (PLN): ", round(Avg_Price, 2))
+    ) %>%       
+    addLegend(position = "bottomleft",    
+    pal = color_palette,    
+    values = ~Avg_Price,    
+    title = "Average Rent Price (PLN)",    
+    opacity = 1 
+    )
+ 
+my_map
+ 
+```
+ 
+ 
+The analysis of average rent prices in Wrocław reveals a discernible variation, with the spectrum spanning from 2000 PLN to nearly 5500 PLN per month. Notably, the more economical options predominantly align with the northern sectors of the city.
+ 
+Top 3 most expensive neighbourhoods in Wrocław according to average rent price:
+ 
+1. **Dąbie**: Positioned as the most expensive locale, boasting an average rent price of 5424.75 PLN per month.
+ 
+2. **Zalesie**: Securing the second position in the hierarchy, this neighborhood commands an average rent of 4900 PLN per month.
+ 
+3. **Radomierzyce**: Occupying the third position, Radomierzyce stands out with an average rent price of 4600 PLN per month.
+ 
+For landlords, focusing on these premium neighborhoods is recommended for renting properties with the highest income potential. This involves understanding the market, tenant preferences, and optimizing property features to appeal to the target demographic in these sought-after areas.
+ 
+## Price vs. Number of Amenities
+ 
+In first scatter plot, we examined the relationship between the price of a flat and the number of amenities it offers. The plot includes amenities such as dishwasher, refrigerator, furniture, oven, stove, washing machine, TV, cable TV, internet, and air conditioning. Each point on the scatter plot represents a property, and the position of the point is determined by its price and the count of amenities it provides. This helps in understanding how the presence of amenities influences property prices, providing valuable insights for both buyers and sellers.
+ 
+Second scatter plot explores the impact of security-related amenities on property prices. It includes features such as closed area, intercom videophone, monitoring security, anti-burglary doors/windows, anti-burglary rollers, and alarm systems. Similar to the previous scatter plot, each point on this graph represents a property, with its position determined by the property's price and the count of security-related amenities. This visualization aids in understanding the correlation between security features and property values, crucial for both homeowners and potential tenants.
+```{r}
+data$Total_Amenities <- rowSums(data[, c("Dishwasher", "Refrigerator", "Furniture", "Oven", "Stove", "Washing_machine", "Tv", "Cable_TV", "Internet", "Air_conditioning")])
+data$Total_Security_Amenities <- rowSums(data[, c("Closed_area", "Intercom_videophone", "Monitoring_security", "Anti_burglary_doors_windows", "Anti_burglary_rollers", "Alarm_system")])
+# Create a scatter plot for general amenities
+ggplot(data, aes(x = Total_Amenities, y = Price_Value)) +
+  geom_point(color = "blue", size = 3) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") + 
+  scale_x_continuous(breaks = seq(min(data$Total_Amenities), max(data$Total_Amenities), by = 1)) +  
+  labs(
+    title = "How number of amenities influences rent price?",
+    x = "Number of Amenities",
+    y = "Rent Price (PLN)"
+  ) +
+  theme_minimal() 
+# Create a scatter plot for security-related amenities
+ggplot(data, aes(x = Total_Security_Amenities, y = Price_Value)) +
+  geom_point(color = "blue", size = 3) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +  
+  scale_x_continuous(breaks = seq(min(data$Total_Security_Amenities), max(data$Total_Security_Amenities), by = 1)) + 
+  labs(
+    title = "How number of security amenities influences rent price?",
+    x = "Number of Security Amenities",
+    y = "Rent Price (PLN)"
+  ) +
+  theme_minimal() 
+```
+ 
+In the first scatter plot, the number of amenities does not show a significant impact on the flat's price. The trend line remains relatively stable, indicating a marginal increase in price with an increase in amenities. This suggests that, in general, the presence of amenities alone might not substantially influence the overall price of the flat.
+ 
+Conversely, the second scatter plot demonstrates a clear upward trend in the trend line. This implies that as the number of security amenities in a flat increases, the flat's price tends to rise significantly. The correlation between security features and pricing is more pronounced, suggesting that security considerations play a more substantial role in determining the value of a property.
+ 
+These observations emphasize the importance of security-related amenities in influencing property prices, while also highlighting that other amenities may have a more marginal impact.
+ 
+ 
+# Strategic Considerations for Landlords
+ 
+In this chapter, we delve into strategic considerations for landlords, exploring key factors in their adverts that can influence rent prices.
+ 
+First plot investigates the impact of the length of property descriptions in advertisements on rent prices. By examining the scatter plot and trend line, landlords can discern whether a more detailed property description correlates with higher rent prices.
+ 
+The second scatter plot explores the relationship between the length of property titles in advertisements and rent prices. Analyzing this plot allows landlords to gauge whether a succinct or elaborate title has any discernible impact on rent prices. Crafting attention-grabbing yet concise titles can be a strategic move to attract potential tenants and potentially influence rental rates.
+ 
+In the third scatter plot, we assess how the number of photos in property advertisements correlates with rent prices.Landlords can glean insights into tenant preferences by observing whether a higher number of photos positively influences rent prices.
+ 
+ 
+```{r}
+ggplot(data, aes(x = nchar(data$Description), y = Price_Value)) +
+  geom_point(color = "blue", size = 3) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(
+    title = "How description length in advert can affect rent price?",
+    x = "Description Length",
+    y = "Rent Price (PLN)"
+  )
+ggplot(data, aes(x = nchar(data$Title), y = Price_Value)) +
+  geom_point(color = "blue", size = 3) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(
+    title = "How title length in advert can affect rent price?",
+    x = "Title Length",
+    y = "Rent Price (PLN)"
+  )
+ggplot(data, aes(x = data$Count_photos, y = Price_Value)) +
+  geom_point(color = "blue", size = 3) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(
+    title = "How number of photos in advert can affect rent price?",
+    x = "Number of photos",
+    y = "Rent Price (PLN)"
+  )
+```
+ 
+First plot clearly illustrates the significant influence of description length on rent prices. Longer descriptions, particularly within the range of 0 to 4000 characters, are associated with higher rent prices. Landlords are advised to craft comprehensive and detailed property descriptions to potentially enhance the perceived value of their rentals and justify higher rental rates.
+ 
+While title length does not exert as strong an influence on rent prices, there is a discernible trend. Flats with longer titles, especially those around 50 characters, tend to command higher rent prices compared to their shorter-titled counterparts. While not as pronounced as description length, optimizing property titles for clarity and informativeness can still contribute to favorable rental pricing.
+ 
+One of the standout findings is the substantial impact of the number of photos on rent prices. The positive correlation indicates that a higher number of photos in property advertisements is associated with higher rent prices. Landlords are strongly recommended to prioritize uploading more photos to their adverts, as it appears to be a key factor influencing potential tenants' perceptions and willingness to pay higher rents.
+ 
+# Conslusion
+
+The report, "Analysis of the Real Estate Market in Wroclaw: Strategic Decision-Making for Landlords" delves into the intricate details of the rental landscape in Wroclaw, aiming to empower landlords with comprehensive insights for informed decision-making. By scrutinizing various aspects, such as property prices, landlord earnings, neighborhood characteristics, and tenant preferences, the analysis not only presents the current state of the market but also equips landlords with the knowledge to adapt to changing economic and societal dynamics. 
+
+Our key findings:
+
+1. Our analysis of the Wrocław rental market highlights key trends and insights for landlords and property managers. We observed a notable surge in demand for rentals priced between 0 to 700 zł, suggesting an attractive range for potential tenants. However, as prices exceed 750 zł, there is a decline in demand, emphasizing the importance of pricing strategy.
+
+2. Landlords aiming for higher rents should note the limited occurrence of prices above 2000 zł and the relatively low frequency of incomes exceeding 10000 zł, indicating less competition in the higher-end segment.
+
+2. Deposit policies should align with market norms, as our data shows a significant presence of properties with lower deposit requirements, enhancing accessibility for a broader tenant base.
+
+3. In terms of location, our report reveals a descending order of average rent prices across Wroclaw districts, with Fabryczna being the most budget-friendly and Siechnice commanding the highest averages.
+
+4. Analyzing advertiser types, estate agencies dominate with a 68.5% share, followed by private advertisements at 30.7%, and developers at 0.8%.
+
+5. Examining building types, apartment blocks and buildings lead with a combined share of 74.1%, while houses and tenement houses constitute smaller portions.
+
+6. Window types highlight a majority of "Plastic" at 53.5%, with 39.1% lacking information, and wooden windows at 6.2%.
+
+7. A correlation between rental price and flat area indicates larger flats command higher prices, emphasizing the value placed on spacious living areas.
+
+8. Analyzing rent prices by the number of floors reveals a concentration on lower floors, with an interesting shift on higher floors showing an uptick in prices.
+
+9. Built year ranges show higher rental prices for more recent constructions, but an anomaly exists with an unexpected rise in prices for flats constructed between 1899 and 1890.
+
+10. The presence of utilities, equipment, and additional features in rental properties correlates with higher average rental prices, providing insights for landlords to enhance property value.
+
+11. Preferences regarding smoking in rental ads show a trend, with 19.1% expressing a preference not to rent to smokers.
+
+12. In terms of location, Wrocław's average rent prices vary, with Dąbie, Zalesie, and Radomierzyce being the top three most expensive neighborhoods.
+
+13. While the number of amenities in a flat shows a marginal impact on price, the number of security amenities significantly influences rental prices.
+
+14. Description length has a substantial impact on rent prices, with longer descriptions associated with higher rents, urging landlords to craft comprehensive and detailed property descriptions.
+
+15. Title length, although not exerting a strong influence, shows a trend, with longer titles associated with higher rent prices.
+
+16. The number of photos in property advertisements correlates positively with higher rent prices, highlighting the importance of uploading more photos to attract potential tenants and justify higher rents.
+
